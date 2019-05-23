@@ -48,6 +48,10 @@ def main():
                         help=('Path to the project that you want wheels for. Default: the current '
                               'directory.'))
 
+    parser.add_argument('--print-build-identifiers',
+                        action='store_true',
+                        help='Print the build identifiers matched by the current invocation and exit.')
+
     args = parser.parse_args()
 
     if args.platform != 'auto':
@@ -105,30 +109,16 @@ def main():
     # This needs to be passed on to the docker container in linux.py
     os.environ['CIBUILDWHEEL'] = '1'
 
-    try:
-        project_setup_py = os.path.join(project_dir, 'setup.py')
-        name_output = subprocess.check_output([sys.executable, project_setup_py, '--name'],
-                                              universal_newlines=True)
-        # the last line of output is the name
-        package_name = name_output.strip().splitlines()[-1]
-    except subprocess.CalledProcessError as err:
-        if not os.path.exists(project_setup_py):
-            print('cibuildwheel: Could not find setup.py at root of project', file=sys.stderr)
-            exit(2)
-        else:
-            print(err.output)
-            print('cibuildwheel: Failed to get name of the package. Command was %s' % err.cmd,
-                  file=sys.stderr)
-            exit(err.returncode)
-
-    if package_name == '' or package_name == 'UNKNOWN':
-        print('cibuildwheel: Invalid package name "%s". Check your setup.py' % package_name,
-              file=sys.stderr)
+    if not os.path.exists(os.path.join(project_dir, 'setup.py')):
+        print('cibuildwheel: Could not find setup.py at root of project', file=sys.stderr)
         exit(2)
+
+    if args.print_build_identifiers:
+        print_build_identifiers(platform, build_selector)
+        exit(0)
 
     build_options = dict(
         project_dir=project_dir,
-        package_name=package_name,
         output_dir=output_dir,
         test_command=test_command,
         test_requires=test_requires,
@@ -167,6 +157,7 @@ def main():
     else:
         raise Exception('Unsupported platform')
 
+
 def print_preamble(platform, build_options):
     print(textwrap.dedent('''
              _ _       _ _   _       _           _
@@ -180,7 +171,7 @@ def print_preamble(platform, build_options):
 
     print('Build options:')
     print('  platform: %r' % platform)
-    for option, value in build_options.items():
+    for option, value in sorted(build_options.items()):
         print('  %s: %r' % (option, value))
 
     warnings = detect_warnings(platform, build_options)
@@ -190,6 +181,21 @@ def print_preamble(platform, build_options):
             print('  ' + warning)
 
     print('\nHere we go!\n')
+
+
+def print_build_identifiers(platform, build_selector):
+    if platform == 'linux':
+        python_configurations = cibuildwheel.linux.get_python_configurations(build_selector)
+    elif platform == 'windows':
+        python_configurations = cibuildwheel.windows.get_python_configurations(build_selector)
+    elif platform == 'macos':
+        python_configurations = cibuildwheel.macos.get_python_configurations(build_selector)
+    else:
+        python_configurations = []
+
+    for config in python_configurations:
+        print(config.identifier)
+
 
 def detect_warnings(platform, build_options):
     warnings = []

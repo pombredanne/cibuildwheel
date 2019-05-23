@@ -49,7 +49,7 @@ Usage
           env: PIP=pip2
 
     script:
-      - $PIP install cibuildwheel==0.10.0
+      - $PIP install cibuildwheel==0.10.2
       - cibuildwheel --output-dir wheelhouse
     ```
 
@@ -106,7 +106,7 @@ Usage
 
     ```
     build_script:
-      - pip install cibuildwheel==0.10.0
+      - pip install cibuildwheel==0.10.2
       - cibuildwheel --output-dir wheelhouse
     artifacts:
       - path: "wheelhouse\\*.whl"
@@ -152,9 +152,8 @@ Options
 -------
 
 ```
-usage: cibuildwheel [-h]
-                    [--output-dir OUTPUT_DIR]
-                    [--platform PLATFORM]
+usage: cibuildwheel [-h] [--platform {auto,linux,macos,windows}]
+                    [--output-dir OUTPUT_DIR] [--print-build-identifiers]
                     [project_dir]
     
 Build wheels for all the platforms.
@@ -174,7 +173,10 @@ optional arguments:
                         you need to run in Windows, and it will build and test
                         for all versions of Python at C:\PythonXX[-x64].
   --output-dir OUTPUT_DIR
-                        Destination folder for the wheels. 
+                        Destination folder for the wheels.
+  --print-build-identifiers
+                        Print the build identifiers matched by the current
+                        invocation and exit.
 
 ```
 
@@ -381,6 +383,7 @@ If your wheel didn't compile, check the list below for some debugging tips.
 - A mistake in your config. To quickly test your config without doing a git push and waiting for your code to build on CI, you can run the Linux build in a Docker container. On Mac or Linux, with Docker running, try `cibuildwheel --platform linux`. You'll have to bring your config into the current environment first.
 - Missing dependency. You might need to install something on the build machine. You can do this in `.travis.yml`, `appveyor.yml`, or `.circleci/config.yml`, with apt-get, brew or whatever Windows uses :P . Given how the Linux build works, we'll probably have to build something into `cibuildwheel`. Let's chat about that over in the issues!
 - Windows: missing C feature. The Windows C compiler doesn't support C language features invented after 1990, so you'll have to backport your C code to C90. For me, this mostly involved putting my variable declarations at the top of the function like an animal.
+- MacOS: calling cibuildwheel from a python3 script and getting a `ModuleNotFoundError`? Due to a [bug](https://bugs.python.org/issue22490) in CPython, you'll need to [unset the `__PYVENV_LAUNCHER__` variable](https://github.com/joerick/cibuildwheel/issues/133#issuecomment-478288597) before activating a venv.
 
 Working examples
 ----------------
@@ -409,6 +412,24 @@ This is similar to static linking, so it might have some licence implications. C
 
 Changelog
 =========
+
+### 0.10.2
+
+_10 March 2019_
+
+- 🛠 Revert temporary fix in macOS, that was working around a bug in pip 19 (#129)
+- 🛠 Update Python to 2.7.16 on macOS
+- 🛠 Update OpenSSL patch to 1.0.2r on macOS
+
+### 0.10.1
+
+_3 February 2019_
+
+- 🐛 Fix build stalling on macOS (that was introduced in pip 19) (#122)
+- 🐛 Fix "AttributeError: 'Popen' object has no attribute 'args'" on Python 2.7 for Linux builds (#108)
+- 🛠 Update Python from 3.6.7, 3.7.1 to 3.6.8, 3.7.2 on macOS
+- 🛠 Update openssl patch from 1.0.2p to 1.0.2q on macOS
+- 🛠 Sorting build options dict items when printing preamble (#114)
 
 ### 0.10.0
 
@@ -582,5 +603,7 @@ Massive props also to-
 
 See also
 --------
+
+If you'd like to keep wheel building separate from the package itself, check out [astrofrog/autowheel](https://github.com/astrofrog/autowheel). It builds packages using cibuildwheel from source distributions on PyPI.
 
 If `cibuildwheel` is too limited for your needs, consider [matthew-brett/multibuild](http://github.com/matthew-brett/multibuild). `multibuild` is a toolbox for building a wheel on various platforms. It can do a lot more than this project - it's used to build SciPy!
